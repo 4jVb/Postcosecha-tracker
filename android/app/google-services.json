@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "870380739357",
+    "project_id": "postcosecha-tracker-a8b8e",
+    "storage_bucket": "postcosecha-tracker-a8b8e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:870380739357:android:6deed5bbcb3363de161ff4",
+        "android_client_info": {
+          "package_name": "com.example.campo_tracker"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD4fJP0-wT-Bwk_hZzNS3OVKbIpELbBPFY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
