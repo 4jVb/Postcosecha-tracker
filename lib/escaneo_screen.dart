@@ -447,7 +447,11 @@ class _EscaneoScreenState extends State<EscaneoScreen> {
           else if (esPantallaLista)
             IconButton(icon: const Icon(Icons.numbers), tooltip: 'Ingreso por número', onPressed: widget.tipo == 'SET' ? _mostrarIngresoManualSET : _mostrarIngresoManualCPT)
           else
-            IconButton(icon: const Icon(Icons.search), tooltip: 'Búsqueda avanzada (INT)', onPressed: _mostrarIngresoManual, icon: widget.tipo == 'INT' ? Icons.search : Icons.edit),
+            IconButton(
+              icon: widget.tipo == 'INT' ? const Icon(Icons.search) : const Icon(Icons.edit),
+              tooltip: 'Búsqueda avanzada (INT)',
+              onPressed: _mostrarIngresoManual,
+            ),
         ],
       ),
       body: esPantallaLista
