@@ -18,14 +18,14 @@ class _EscaneoScreenState extends State<EscaneoScreen> {
   final MobileScannerController _scannerController = MobileScannerController(
     detectionSpeed: DetectionSpeed.normal,
     facing: CameraFacing.back,
-    autoStart: false, // Cambiado a false para no encender la cámara hasta que se le diga
+    autoStart: false, // No enciende la cámara hasta que se le diga
     formats: [BarcodeFormat.qrCode],
     detectionTimeoutMs: 250,
   );
 
   bool _procesando = false;
   bool _permisoConcedido = false;
-  bool _usandoCamara = false; // NUEVO: Controla si la cámara está encendida
+  bool _usandoCamara = false; // Controla si la cámara está encendida
   final List<Map<String, dynamic>> _enviosSesion = [];
 
   List<Map<String, dynamic>> _plotsSet = [];
@@ -47,7 +47,7 @@ class _EscaneoScreenState extends State<EscaneoScreen> {
   List<Map<String, dynamic>> _enviosIptHoy = [];
   bool _cargandoIptHoy = false;
 
-  // NUEVO: Controlador para el campo de texto del láser
+  // Controladores para el campo de texto del láser
   final _laserController = TextEditingController();
   final _laserFocusNode = FocusNode();
 
@@ -68,7 +68,6 @@ class _EscaneoScreenState extends State<EscaneoScreen> {
       _cargarPlotsCpt();
     } else if (widget.tipo == 'IPT') {
       _cargarEnviosIptHoy();
-      // En lugar de encender la cámara, enfocamos el teclado para el láser
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _laserFocusNode.requestFocus();
       });
@@ -89,14 +88,13 @@ class _EscaneoScreenState extends State<EscaneoScreen> {
   }
 
   // ==========================================
-  // NUEVO: INTERFAZ LÁSER / TECLADO (Honeywell)
+  // INTERFAZ LÁSER / TECLADO (Honeywell)
   // ==========================================
   Future<void> _procesarLaserInput(String input) async {
     if (_procesando || input.trim().isEmpty) return;
     setState(() => _procesando = true);
     
-    // No limpiamos el campo automáticamente para que sea más rápido, 
-    // pero seleccionamos todo el texto para que el próximo escaneo lo reemplace
+    // Selecciona todo el texto para que el próximo escaneo lo reemplace
     _laserController.selection = TextSelection(baseOffset: 0, extentOffset: _laserController.text.length);
 
     await _procesarEscaneo(input.trim());
@@ -118,13 +116,13 @@ class _EscaneoScreenState extends State<EscaneoScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                widget.tipo == 'INT' ? 'Modo Lector / Consulta' : 'Modo Lector (Lázer Honeywell)',
+                widget.tipo == 'INT' ? 'Modo Lector / Consulta' : 'Modo Lector (Láser Honeywell)',
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
-                'Apunte con el lázer o escriba el código. Se procesa automáticamente al escanear.',
+                'Apunte con el láser o escriba el código. Se procesa automáticamente al escanear.',
                 style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 textAlign: TextAlign.center,
               ),
@@ -133,7 +131,7 @@ class _EscaneoScreenState extends State<EscaneoScreen> {
                 controller: _laserController,
                 focusNode: _laserFocusNode,
                 autofocus: true,
-                onSubmitted: _procesarLaserInput, // Se dispara al recibir el "Enter" del lázer
+                onSubmitted: _procesarLaserInput,
                 decoration: InputDecoration(
                   border: const OutlineInputBorder(),
                   labelText: 'Esperando escaneo...',
@@ -182,7 +180,6 @@ class _EscaneoScreenState extends State<EscaneoScreen> {
     );
   }
 
-  // NUEVO: Método para encender la cámara desde el botón
   Future<void> _activarCamara() async {
     final status = await Permission.camera.status;
     if (status.isGranted) {
@@ -214,25 +211,11 @@ class _EscaneoScreenState extends State<EscaneoScreen> {
       final plots = await _db.obtenerPlotsBloque(widget.proyecto, 'SET', bloque);
       final Set<String> enviados = {};
       for (var plot in plots) {
-        if (await _db.fueEnviadoHoy(plot['plot_name'])) {
-          enviados.add(plot['plot_name'] as String);
-        }
+        if (await _db.fueEnviadoHoy(plot['plot_name'])) enviados.add(plot['plot_name'] as String);
       }
-      if (mounted) {
-        setState(() {
-          _plotsSet = plots;
-          _seleccionadosHoy = enviados;
-          _cargandoPlots = false;
-          _errorSet = null;
-        });
-      }
+      if (mounted) setState(() { _plotsSet = plots; _seleccionadosHoy = enviados; _cargandoPlots = false; _errorSet = null; });
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _cargandoPlots = false;
-          _errorSet = 'Error al cargar plots: $e';
-        });
-      }
+      if (mounted) setState(() { _cargandoPlots = false; _errorSet = 'Error al cargar plots: $e'; });
     }
   }
 
@@ -243,69 +226,30 @@ class _EscaneoScreenState extends State<EscaneoScreen> {
     Color color = Colors.red;
     if (estaMarcado) {
       await _db.eliminarEnvioHoy(plotName);
-      if (mounted) {
-        setState(() {
-          _seleccionadosHoy.remove(plotName);
-          _enviosSesion.removeWhere((e) => e['plot'] == plotName);
-          _mostrarResultado = false;
-        });
-      }
+      if (mounted) setState(() { _seleccionadosHoy.remove(plotName); _enviosSesion.removeWhere((e) => e['plot'] == plotName); _mostrarResultado = false; });
     } else {
       final result = await _db.registrarEnvio(plotName, widget.proyecto, 'SET');
       if (result['status'] == 'OK') {
         msg = 'Accesión: ${result['accession_name']}\nBloque: ${result['block_number']}\nPlot N°: ${result['plot_number']}\n¡Registro exitoso!';
         color = Colors.green;
-        if (mounted) {
-          setState(() {
-            _seleccionadosHoy.add(plotName);
-            _enviosSesion.add({'plot': plotName, 'msg': 'Acc: ${result['accession_name']} | Blq: ${result['block_number']}'});
-          });
-        }
+        if (mounted) setState(() { _seleccionadosHoy.add(plotName); _enviosSesion.add({'plot': plotName, 'msg': 'Acc: ${result['accession_name']} | Blq: ${result['block_number']}'}); });
         HapticFeedback.mediumImpact();
-      } else if (result['status'] == 'BLOQUE_FUTURO') {
-        msg = result['mensaje'] ?? 'Error al registrar.';
-        color = Colors.orange;
-        HapticFeedback.heavyImpact();
-      } else {
-        msg = 'Plot enviado';
-        color = Colors.red;
-        HapticFeedback.heavyImpact();
-      }
+      } else if (result['status'] == 'BLOQUE_FUTURO') { msg = result['mensaje'] ?? 'Error al registrar.'; color = Colors.orange; HapticFeedback.heavyImpact(); }
+      else { msg = 'Plot enviado'; color = Colors.red; HapticFeedback.heavyImpact(); }
     }
-    if (mounted) {
-      setState(() {
-        _ultimoPlot = plotName;
-        _ultimoMsg = msg;
-        _ultimoColor = color;
-        _mostrarResultado = (msg.isNotEmpty);
-      });
-    }
+    if (mounted) setState(() { _ultimoPlot = plotName; _ultimoMsg = msg; _ultimoColor = color; _mostrarResultado = (msg.isNotEmpty); });
   }
 
   Future<void> _procesarManualSET(String input) async {
     final inputNum = int.tryParse(input);
-    final plot = _plotsSet.firstWhere(
-      (p) => inputNum != null ? (int.tryParse(p['plot_number'] as String) == inputNum) : (p['plot_number'] == input),
-      orElse: () => <String, dynamic>{},
-    );
-    if (plot.isEmpty) {
-      setState(() { _ultimoPlot = input; _ultimoMsg = 'Plot N° $input no encontrado en el bloque actual'; _ultimoColor = Colors.red; _mostrarResultado = true; });
-      HapticFeedback.heavyImpact();
-      return;
-    }
+    final plot = _plotsSet.firstWhere((p) => inputNum != null ? (int.tryParse(p['plot_number'] as String) == inputNum) : (p['plot_number'] == input), orElse: () => <String, dynamic>{});
+    if (plot.isEmpty) { setState(() { _ultimoPlot = input; _ultimoMsg = 'Plot N° $input no encontrado en el bloque actual'; _ultimoColor = Colors.red; _mostrarResultado = true; }); HapticFeedback.heavyImpact(); return; }
     await _toggleSeleccion(plot);
   }
 
   void _mostrarIngresoManualSET() {
     final controller = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Registrar Sensorial (SET)'),
-        content: TextField(controller: controller, autofocus: true, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: 'Ej: 1', border: OutlineInputBorder(), isDense: true), onSubmitted: (v) { Navigator.pop(ctx); if (v.trim().isNotEmpty) _procesarManualSET(v.trim()); }),
-        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')), FilledButton(onPressed: () { Navigator.pop(ctx); if (controller.text.trim().isNotEmpty) _procesarManualSET(controller.text.trim()); }, child: const Text('Aceptar'))],
-      ),
-    );
+    showDialog(context: context, builder: (ctx) => AlertDialog(title: const Text('Registrar Sensorial (SET)'), content: TextField(controller: controller, autofocus: true, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: 'Ej: 1', border: OutlineInputBorder(), isDense: true), onSubmitted: (v) { Navigator.pop(ctx); if (v.trim().isNotEmpty) _procesarManualSET(v.trim()); }), actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')), FilledButton(onPressed: () { Navigator.pop(ctx); if (controller.text.trim().isNotEmpty) _procesarManualSET(controller.text.trim()); }, child: const Text('Aceptar'))]));
   }
 
   Widget _buildSetUI() {
@@ -315,22 +259,10 @@ class _EscaneoScreenState extends State<EscaneoScreen> {
     return Column(
       children: [
         if (_mostrarResultado) _buildResultado(),
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.only(top: 8, bottom: 80),
-            itemCount: _plotsSet.length,
-            itemBuilder: (context, index) {
-              final plot = _plotsSet[index];
-              final plotName = plot['plot_name'] as String;
-              final estaMarcado = _seleccionadosHoy.contains(plotName);
-              return Container(
-                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(color: estaMarcado ? Colors.teal.withOpacity(0.1) : Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: estaMarcado ? Colors.teal : Colors.grey.shade300)),
-                child: CheckboxListTile(controlAffinity: ListTileControlAffinity.leading, contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), title: Text(plot['plot_number'], style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'monospace', fontSize: 16)), subtitle: Text('${plot['plot_name']}\n${plot['accession_name']}', style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: Colors.grey[700])), value: estaMarcado, activeColor: Colors.teal, onChanged: (bool? value) => _toggleSeleccion(plot)),
-              );
-            },
-          ),
-        ),
+        Expanded(child: ListView.builder(padding: const EdgeInsets.only(top: 8, bottom: 80), itemCount: _plotsSet.length, itemBuilder: (context, index) {
+          final plot = _plotsSet[index]; final plotName = plot['plot_name'] as String; final estaMarcado = _seleccionadosHoy.contains(plotName);
+          return Container(margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), decoration: BoxDecoration(color: estaMarcado ? Colors.teal.withOpacity(0.1) : Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: estaMarcado ? Colors.teal : Colors.grey.shade300)), child: CheckboxListTile(controlAffinity: ListTileControlAffinity.leading, contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), title: Text(plot['plot_number'], style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'monospace', fontSize: 16)), subtitle: Text('${plot['plot_name']}\n${plot['accession_name']}', style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: Colors.grey[700])), value: estaMarcado, activeColor: Colors.teal, onChanged: (bool? value) => _toggleSeleccion(plot)));
+        })),
       ],
     );
   }
@@ -401,7 +333,7 @@ class _EscaneoScreenState extends State<EscaneoScreen> {
   }
 
   // ==========================================
-  // NUEVO: DESMARCAR IPT
+  // DESMARCAR IPT
   // ==========================================
   Future<void> _cargarEnviosIptHoy() async {
     setState(() => _cargandoIptHoy = true);
@@ -422,7 +354,7 @@ class _EscaneoScreenState extends State<EscaneoScreen> {
   }
 
   // ==========================================
-  // NUEVO: WIDGET RICO PARA INT
+  // WIDGET RICO PARA INT
   // ==========================================
   Widget _buildIntResultado() {
     final r = _resultadoINT!;
@@ -454,7 +386,7 @@ class _EscaneoScreenState extends State<EscaneoScreen> {
   }
 
   // ==========================================
-  // NUEVO: CONSTRUIR LISTA INFERIOR
+  // CONSTRUIR LISTA INFERIOR
   // ==========================================
   List<Widget> _buildListaInferior() {
     final widgets = <Widget>[];
@@ -489,9 +421,6 @@ class _EscaneoScreenState extends State<EscaneoScreen> {
     return SizedBox(height: MediaQuery.of(context).size.height * 0.4, child: Stack(children: [ClipRRect(borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(24), bottomRight: Radius.circular(24)), child: MobileScanner(controller: _scannerController, onDetect: _onDetect, errorBuilder: (c, e, ch) => Container(color: Colors.black))), Center(child: Container(width: 220, height: 220, decoration: BoxDecoration(border: Border.all(color: Colors.white, width: 2), borderRadius: BorderRadius.circular(16)), child: const Center(child: Icon(Icons.qr_code_2, size: 60, color: Colors.white54)))), if (_procesando) Container(color: Colors.black54, child: const Center(child: CircularProgressIndicator(color: Colors.white)))]));
   }
 
-  // ==========================================
-  // INTERFAZ GENÉRICA (SIN CAMBIOS)
-  // ==========================================
   Widget _buildResultado() {
     if (_ultimoMsg == null || _ultimoColor == null) return const SizedBox.shrink();
     return Container(color: _ultimoColor!.withOpacity(0.1), padding: const EdgeInsets.all(12), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(_ultimoColor == Colors.green ? Icons.check_circle : _ultimoColor == Colors.red ? Icons.block : Icons.info, color: _ultimoColor, size: 32), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(_ultimoPlot ?? '', style: const TextStyle(fontFamily: 'monospace', fontSize: 13, fontWeight: FontWeight.bold)), const SizedBox(height: 4), Text(_ultimoMsg!, style: TextStyle(fontSize: 12, color: Colors.grey[700]))]))]));
@@ -505,11 +434,10 @@ class _EscaneoScreenState extends State<EscaneoScreen> {
       appBar: AppBar(
         title: Text(_titulo),
         actions: [
-          // NUEVO: Si estamos en cámara, dar opción de volver al láser
           if (!esPantallaLista && _usandoCamara)
             IconButton(
               icon: const Icon(Icons.keyboard),
-              tooltip: 'Modo Lázer / Teclado',
+              tooltip: 'Modo Láser / Teclado',
               onPressed: () {
                 _scannerController.stop();
                 setState(() => _usandoCamara = false);
@@ -524,14 +452,13 @@ class _EscaneoScreenState extends State<EscaneoScreen> {
       ),
       body: esPantallaLista
           ? (widget.tipo == 'SET' ? _buildSetUI() : _buildCptUI())
-          // NUEVO: Si no usa cámara, mostrar UI del Láser. Si usa cámara, mostrar cámara.
           : _usandoCamara
               ? Column(children: [
                   _buildCamara(),
                   const Divider(height: 1),
                   if (_mostrarResultado && widget.tipo == 'INT' && _resultadoINT != null) _buildIntResultado()
                   else if (_mostrarResultado) _buildResultado(),
-                  Expanded(child: Column(children: [Padding(padding: const EdgeInsets.all(12), child: Row(children: [const Text('Registros esta sesión', style: TextStyle(fontWeight: FontWeight.bold)), const Spacer(), Text('${_enviosSesion.length}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue))])), const Divider(height: 1), Expanded(child: _enviosSesion.isEmpty ? const Center(child: Text('Apunta la cámara al QR\no usa el modo Lázer', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey))) : ListView(children: _buildListaInferior()))]))
+                  Expanded(child: Column(children: [Padding(padding: const EdgeInsets.all(12), child: Row(children: [const Text('Registros esta sesión', style: TextStyle(fontWeight: FontWeight.bold)), const Spacer(), Text('${_enviosSesion.length}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue))])), const Divider(height: 1), Expanded(child: _enviosSesion.isEmpty ? const Center(child: Text('Apunta la cámara al QR\no usa el modo Láser', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey))) : ListView(children: _buildListaInferior()))]))
                 ])
               : _buildLaserUI(),
     );

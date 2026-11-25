@@ -60,32 +60,6 @@ class FirebaseSync {
     await batch.commit();
   }
 
-  Future<void> bajarPlots() async {
-    final snapshot = await _firestore.collection('plots').get();
-    final listaPlots = <Map<String, dynamic>>[];
-    for (var doc in snapshot.docs) {
-      final data = doc.data();
-      listaPlots.add({'project_name': data['project_name'], 'experiment_type': data['experiment_type'], 'plot_name': doc.id, 'plot_number': data['plot_number'], 'accession_name': data['accession_name'], 'block_number': data['block_number'], 'pais': data['pais'], 'sample': data['sample']});
-    }
-    if (listaPlots.isNotEmpty) await _db.insertarPlots(listaPlots);
-  }
-
-  Future<void> bajarEnvios() async {
-    final snapshot = await _firestore.collection('envios').get();
-    if (snapshot.docs.isEmpty) return;
-    final db = await _db.database;
-    final batchDelete = db.batch();
-    for (var doc in snapshot.docs) { final data = doc.data(); batchDelete.delete('envios', where: 'plot_name = ? AND fecha_envio = ?', whereArgs: [data['plot_name'], data['fecha_envio']]); }
-    await batchDelete.commit(noResult: true);
-    final batchInsert = db.batch();
-    for (var doc in snapshot.docs) {
-      final data = doc.data();
-      batchInsert.insert('envios', {'project_name': data['project_name'], 'experiment_type': data['experiment_type'], 'plot_name': data['plot_name'], 'plot_number': data['plot_number'], 'accession_name': data['accession_name'], 'block_number': data['block_number'], 'fecha_envio': data['fecha_envio'], 'fecha_hora': data['fecha_hora']});
-    }
-    await batchInsert.commit(noResult: true);
-  }
-
-  // NUEVO: Descargar bloques para sincronizar correctamente
   Future<void> bajarBloques() async {
     final snapshot = await _firestore.collection('bloques_estado').get();
     if (snapshot.docs.isEmpty) return;
@@ -102,15 +76,16 @@ class FirebaseSync {
     }
   }
 
+  // OPTIMIZADO: Ya no baja todos los plots y envíos para no saturar la RAM del celular
   Future<void> sincronizarTodo({String? proyectoActual}) async {
     try {
       await _asegurarSesion();
       await subirPlots();
       await subirEnvios();
       await subirBloques();
-      await bajarPlots();
-      await bajarEnvios();
-      await bajarBloques(); // NUEVO: Ahora sí descarga los bloques
-    } catch (e) { throw Exception('Error al sincronizar: $e'); }
+      await bajarBloques();
+    } catch (e) { 
+      throw Exception('Error al sincronizar: $e'); 
+    }
   }
 }

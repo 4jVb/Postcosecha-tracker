@@ -47,37 +47,23 @@ class MainActivity: FlutterActivity() {
         if (requestCode == CREAR_ARCHIVO && resultCode == Activity.RESULT_OK) {
             data?.data?.let { uri ->
                 try {
-                    contentResolver.takePersistableUriPermission(
-                        uri,
-                        Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                    )
-                    
+                    contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
                     val path = uri.toString()
-                    MethodChannel(flutterEngine!!.dartExecutor.binaryMessenger, CHANNEL)
-                        .invokeMethod("rutaSeleccionada", path)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
+                    MethodChannel(flutterEngine!!.dartExecutor.binaryMessenger, CHANNEL).invokeMethod("rutaSeleccionada", path)
+                } catch (e: Exception) { e.printStackTrace() }
             }
         }
     }
 
     private fun escribirEnUri(uriStr: String?, contenido: String?, result: MethodChannel.Result) {
         try {
-            if (uriStr == null || contenido == null) {
-                result.error("ERROR", "Datos vacíos", null)
-                return
-            }
+            if (uriStr == null || contenido == null) { result.error("ERROR", "Datos vacíos", null); return }
             val uri = Uri.parse(uriStr)
             contentResolver.openOutputStream(uri)?.use { outputStream ->
                 outputStream.write(contenido.toByteArray(Charsets.UTF_8))
                 outputStream.flush()
                 result.success("OK")
-            } ?: run {
-                result.error("ERROR", "No se pudo abrir el archivo", null)
-            }
-        } catch (e: Exception) {
-            result.error("ERROR_ESCRITURA", e.message, null)
-        }
+            } ?: run { result.error("ERROR", "No se pudo abrir el archivo", null) }
+        } catch (e: Exception) { result.error("ERROR_ESCRITURA", e.message, null) }
     }
 }

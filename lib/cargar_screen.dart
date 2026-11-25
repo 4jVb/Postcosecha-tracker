@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'; // NUEVO
 import 'package:file_selector/file_selector.dart';
 import 'database_helper.dart';
 
@@ -24,7 +25,7 @@ class _CargarScreenState extends State<CargarScreen> {
       Card(color: Colors.blue.shade50, child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [Icon(Icons.info_outline, color: Colors.blue.shade700), const SizedBox(width: 8), Text('Formato CSV Automático', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue.shade700))]),
         const SizedBox(height: 8),
-        const Text('La app detectará el Proyecto (ej: PE1-BLBP-PCIII) y el Tipo (INT, IPT, SET) automáticamente del nombre del plot.\n\nColumnas esperadas:\n- Campo/INT: plot_name, accession_name, plot_number\n- Postcosecha/Sensorial: plot_name, accession_name, plot_number, block_number', style: TextStyle(fontSize: 13))
+        const Text('La app detectará el Proyecto y el Tipo automáticamente del nombre del plot.\n\nColumnas esperadas:\n- Campo/INT: plot_name, accession_name, plot_number\n- Postcosecha/Sensorial: plot_name, accession_name, plot_number, block_number', style: TextStyle(fontSize: 13))
       ]))),
       const SizedBox(height: 16),
       FilledButton.icon(onPressed: _cargando ? null : _seleccionarArchivo, icon: const Icon(Icons.folder_open), label: const Text('Seleccionar archivo CSV'), style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16))),
@@ -57,9 +58,15 @@ class _CargarScreenState extends State<CargarScreen> {
       final XFile? archivo = await openFile(acceptedTypeGroups: [typeGroup]);
       if (archivo == null) return;
       final contenido = await archivo.readAsString();
-      final plots = _db.parsearCSV(contenido);
+      // FIX RENDIMIENTO: Procesar en segundo plano
+      final plots = await compute(_parsearCSVenSegundoPlano, contenido);
       setState(() { _rutaArchivo = archivo.path; _plotsParseados = plots; });
     } catch (e) { setState(() => _error = e.toString()); }
+  }
+
+  // Función estática para segundo plano
+  static List<Map<String, dynamic>> _parsearCSVenSegundoPlano(String contenido) {
+    return DatabaseHelper().parsearCSV(contenido);
   }
 
   Future<void> _guardarPlots() async {

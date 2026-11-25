@@ -43,7 +43,7 @@ class _EnviosScreenState extends State<EnviosScreen> {
       if (uriStr.isNotEmpty) {
         try {
           // Enviar la URI y el texto a Android para que lo escriba correctamente
-          final String resultado = await _channel.invokeMethod('escribirEnUri', {
+          await _channel.invokeMethod('escribirEnUri', {
             'uri': uriStr,
             'contenido': _csv,
           });

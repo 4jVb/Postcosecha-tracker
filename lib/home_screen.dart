@@ -26,15 +26,21 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _cargarDatos() async {
     final proyectos = await _db.obtenerProyectos();
     if (proyectos.isNotEmpty && _proyectoSeleccionado == null) _proyectoSeleccionado = proyectos.first;
-    // Trae los bloques de la nube SOLO una vez al abrir la app, para todos los proyectos
+    
+    // NUEVO: Sincroniza en segundo plano sin congelar la interfaz
+    _sincronizarBloquesEnSegundoPlano(proyectos);
+
+    await _cargarEstadisticas();
+    if (mounted) setState(() { _proyectos = proyectos; _cargando = false; });
+  }
+
+  Future<void> _sincronizarBloquesEnSegundoPlano(List<String> proyectos) async {
     for (var proyecto in proyectos) {
       await _db.sincronizarBloquesDesdeNube(proyecto, 'IPT');
       await _db.sincronizarBloquesDesdeNube(proyecto, 'SET');
       await _db.sincronizarBloquesDesdeNube(proyecto, 'CPT');
     }
-
-    await _cargarEstadisticas();
-    if (mounted) setState(() { _proyectos = proyectos; _cargando = false; });
+    if (mounted) _cargarEstadisticas();
   }
 
   Future<void> _cargarEstadisticas() async {
