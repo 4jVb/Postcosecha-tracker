@@ -76,16 +76,102 @@ class FirebaseSync {
     }
   }
 
-  // OPTIMIZADO: Ya no baja todos los plots y envíos para no saturar la RAM del celular
-  Future<void> sincronizarTodo({String? proyectoActual}) async {
+  // ============================================================
+  // NUEVO: DESCARGA de plots desde Firestore.
+  // Permite recuperar los libros de campo al instalar la app en un
+  // dispositivo nuevo o después de "Formatear Todo".
+  // Inserta por chunks para no saturar la RAM ni la base local.
+  // ============================================================
+  Future<int> bajarPlots() async {
+    final snapshot = await _firestore.collection('plots').get();
+    if (snapshot.docs.isEmpty) return 0;
+    final db = await _db.database;
+    final int chunkSize = 500;
+    for (int i = 0; i < snapshot.docs.length; i += chunkSize) {
+      final end = (i + chunkSize < snapshot.docs.length) ? i + chunkSize : snapshot.docs.length;
+      final batch = db.batch();
+      for (var doc in snapshot.docs.sublist(i, end)) {
+        final d = doc.data();
+        final bloque = d['block_number'];
+        batch.insert('plots', {
+          'project_name': (d['project_name'] ?? '').toString(),
+          'experiment_type': (d['experiment_type'] ?? '').toString(),
+          'plot_name': doc.id,
+          'plot_number': (d['plot_number'] ?? '').toString(),
+          'accession_name': (d['accession_name'] ?? '').toString(),
+          'block_number': bloque is int ? bloque : int.tryParse('${bloque ?? ''}'),
+          'pais': d['pais']?.toString(),
+          'sample': d['sample']?.toString(),
+        }, conflictAlgorithm: ConflictAlgorithm.ignore); // plots tiene UNIQUE(plot_name)
+      }
+      await batch.commit(noResult: true);
+    }
+    return snapshot.docs.length;
+  }
+
+  // ============================================================
+  // NUEVO: DESCARGA de envíos históricos desde Firestore.
+  // La tabla envios NO tiene restricción UNIQUE, así que se
+  // des-duplica manualmente con la clave plot_name + fecha_envio.
+  // ============================================================
+  Future<int> bajarEnvios() async {
+    final snapshot = await _firestore.collection('envios').get();
+    if (snapshot.docs.isEmpty) return 0;
+    final db = await _db.database;
+    // Claves ya existentes en local para no duplicar
+    final existentes = await db.rawQuery('SELECT plot_name || \'_\' || fecha_envio AS clave FROM envios');
+    final clavesExistentes = existentes.map((r) => r['clave'] as String).toSet();
+    final int chunkSize = 500;
+    int insertados = 0;
+    for (int i = 0; i < snapshot.docs.length; i += chunkSize) {
+      final end = (i + chunkSize < snapshot.docs.length) ? i + chunkSize : snapshot.docs.length;
+      final batch = db.batch();
+      for (var doc in snapshot.docs.sublist(i, end)) {
+        final d = doc.data();
+        final plotName = (d['plot_name'] ?? doc.id.split('_').first).toString();
+        final fecha = (d['fecha_envio'] ?? '').toString();
+        if (fecha.isEmpty) continue;
+        final clave = '${plotName}_$fecha';
+        if (clavesExistentes.contains(clave)) continue; // ya existe localmente
+        clavesExistentes.add(clave);
+        final bloque = d['block_number'];
+        batch.insert('envios', {
+          'project_name': (d['project_name'] ?? '').toString(),
+          'experiment_type': (d['experiment_type'] ?? '').toString(),
+          'plot_name': plotName,
+          'plot_number': (d['plot_number'] ?? '').toString(),
+          'accession_name': (d['accession_name'] ?? '').toString(),
+          'block_number': bloque is int ? bloque : int.tryParse('${bloque ?? ''}') ?? 0,
+          'fecha_envio': fecha,
+          'fecha_hora': (d['fecha_hora'] ?? '').toString(),
+        });
+        insertados++;
+      }
+      await batch.commit(noResult: true);
+    }
+    return insertados;
+  }
+
+  // ============================================================
+  // sincronizarTodo:
+  //  1. Sube todo lo local (plots, envíos, bloques)
+  //  2. Baja bloques (siempre: es liviano)
+  //  3. Si [descargarDatos] = true, también BAJA plots y envíos
+  //     de la nube (necesario en dispositivo nuevo o tras formatear).
+  // ============================================================
+  Future<void> sincronizarTodo({String? proyectoActual, bool descargarDatos = false}) async {
     try {
       await _asegurarSesion();
       await subirPlots();
       await subirEnvios();
       await subirBloques();
       await bajarBloques();
-    } catch (e) { 
-      throw Exception('Error al sincronizar: $e'); 
+      if (descargarDatos) {
+        await bajarPlots();
+        await bajarEnvios();
+      }
+    } catch (e) {
+      throw Exception('Error al sincronizar: $e');
     }
   }
 }

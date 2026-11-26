@@ -214,11 +214,23 @@ class DatabaseHelper {
       listaCpt = (resCptPlots.isNotEmpty && resCptPlots.first['plots'] != null) ? resCptPlots.first['plots'] as String : '';
     }
 
+    // NUEVO: Historial completo de envíos de este genotipo (todas las fechas y bloques)
+    final resHistorial = await db.rawQuery(
+      'SELECT experiment_type, block_number, COUNT(*) as veces FROM envios '
+      'WHERE project_name = ? AND accession_name = ? '
+      'GROUP BY experiment_type, block_number ORDER BY experiment_type, block_number',
+      [projectName, accession]);
+    final historial = <Map<String, dynamic>>[
+      for (var h in resHistorial)
+        {'experiment_type': h['experiment_type'], 'block_number': h['block_number'], 'veces': h['veces']}
+    ];
+
     return {
       'status': 'ENCONTRADO', 'accession_name': accession, 'plot_name': plotName, 'plot_number': plot['plot_number'],
       'enviado_ipt': enviadoIpt, 'enviado_set': enviadoSet, 'enviado_cpt': enviadoCpt,
       'tiene_cpt': tieneCpt, 'lista_ipt': listaIpt, 'lista_set': listaSet, 'lista_cpt': listaCpt,
       'lista_int': listaInt, 'bloque_ipt': bloqueIpt, 'bloque_set': bloqueSet, 'bloque_cpt': bloqueCpt,
+      'historial': historial,
     };
   }
 
@@ -292,13 +304,98 @@ class DatabaseHelper {
     await db.delete('envios'); await db.delete('plots'); await db.delete('bloques_estado');
   }
 
+  // ============================================================
+  // CSV FLEXIBLE: detecta las columnas por el ENCABEZADO (header),
+  // así el orden de las columnas ya no importa. Si el CSV no tiene
+  // encabezado, usa el orden fijo de siempre (compatible hacia atrás).
+  // ============================================================
+  static const Map<String, String> _aliasColumnas = {
+    'plot_name': 'plot_name', 'plot': 'plot_name', 'plotname': 'plot_name', 'nombre_plot': 'plot_name',
+    'accession_name': 'accession_name', 'accession': 'accession_name', 'accessionname': 'accession_name', 'genotipo': 'accession_name', 'genotype': 'accession_name',
+    'plot_number': 'plot_number', 'plotnumber': 'plot_number', 'numero_plot': 'plot_number', 'numero': 'plot_number',
+    'block_number': 'block_number', 'blocknumber': 'block_number', 'block': 'block_number', 'bloque': 'block_number', 'block_no': 'block_number',
+    'pais': 'pais', 'país': 'pais', 'country': 'pais',
+    'sample': 'sample', 'muestra': 'sample',
+    'fecha': 'fecha', 'fecha_envio': 'fecha', 'enviado': 'enviado',
+  };
+
+  /// Si la fila parece un encabezado (contiene plot_name y al menos otra
+  /// columna conocida), devuelve campo -> índice de columna. Si no, null.
+  static Map<String, int>? detectarEncabezado(List<String> celdas) {
+    final map = <String, int>{};
+    for (int i = 0; i < celdas.length; i++) {
+      final campo = _aliasColumnas[celdas[i].trim().toLowerCase().replaceAll(' ', '_')];
+      if (campo != null && !map.containsKey(campo)) map[campo] = i;
+    }
+    return (map.containsKey('plot_name') && map.length >= 2) ? map : null;
+  }
+
+  /// Busca el encabezado en la primera línea con contenido.
+  /// Devuelve [indiceInicioDatos, separador, columnas] o null si no hay header.
+  static List<dynamic>? _buscarEncabezado(List<String> lineas) {
+    for (int i = 0; i < lineas.length; i++) {
+      final l = lineas[i].trim().replaceAll('\uFEFF', '');
+      if (l.isEmpty) continue;
+      final separador = l.contains(';') ? ';' : ',';
+      final celdas = l.split(separador).map((c) => c.trim()).toList();
+      final columnas = detectarEncabezado(celdas);
+      if (columnas != null) return [i + 1, separador, columnas];
+      return null; // la primera línea con contenido es data: no hay encabezado
+    }
+    return null;
+  }
+
   List<Map<String, dynamic>> parsearCSV(String contenido) {
     final lineas = contenido.split(RegExp(r'\r\n|\r|\n'));
+    final header = _buscarEncabezado(lineas);
+    if (header != null) {
+      return _parsearCSVPorEncabezado(lineas, header[0] as int, header[1] as String, header[2] as Map<String, int>);
+    }
+    return _parsearCSVPosicional(lineas, lineas.isNotEmpty && lineas.first.contains(';') ? ';' : ',');
+  }
+
+  /// CSV con encabezado: las columnas pueden estar en CUALQUIER orden.
+  List<Map<String, dynamic>> _parsearCSVPorEncabezado(List<String> lineas, int inicio, String separador, Map<String, int> columnas) {
+    if (!columnas.containsKey('accession_name') || !columnas.containsKey('plot_number')) {
+      throw const FormatException('El encabezado debe incluir: plot_name, accession_name y plot_number');
+    }
+    final plots = <Map<String, dynamic>>[];
+    for (int i = inicio; i < lineas.length; i++) {
+      final linea = lineas[i].trim().replaceAll('\uFEFF', '');
+      if (linea.isEmpty) continue;
+      final celdas = linea.split(separador).map((c) => c.trim()).toList();
+      final plotName = celdas[columnas['plot_name']!];
+      if (plotName.isEmpty) continue;
+      final parsed = parsePlotName(plotName);
+      final String expType = parsed['experiment_type'];
+      if (expType == 'UNKNOWN') throw FormatException('Línea ${i + 1}: No se pudo detectar el tipo en $plotName');
+      String? blockStr;
+      final bi = columnas['block_number'];
+      if (bi != null && bi < celdas.length && celdas[bi].isNotEmpty) blockStr = celdas[bi];
+      final plotMap = <String, dynamic>{
+        'project_name': parsed['project_name'],
+        'experiment_type': expType,
+        'plot_name': plotName,
+        'plot_number': celdas[columnas['plot_number']!],
+        'accession_name': celdas[columnas['accession_name']!],
+        'block_number': blockStr != null ? int.tryParse(blockStr) : null,
+      };
+      final pi = columnas['pais'];
+      if (pi != null && pi < celdas.length && celdas[pi].isNotEmpty) plotMap['pais'] = celdas[pi];
+      final si = columnas['sample'];
+      if (si != null && si < celdas.length && celdas[si].isNotEmpty) plotMap['sample'] = celdas[si];
+      plots.add(plotMap);
+    }
+    if (plots.isEmpty) throw const FormatException('El archivo no tiene datos válidos');
+    return plots;
+  }
+
+  /// CSV sin encabezado: orden fijo (comportamiento original).
+  List<Map<String, dynamic>> _parsearCSVPosicional(List<String> lineas, String separador) {
     final plots = <Map<String, dynamic>>[];
     int lineaNum = 0;
     for (var linea in lineas) {
       lineaNum++; linea = linea.trim().replaceAll('\uFEFF', ''); if (linea.isEmpty) continue;
-      final separador = linea.contains(';') ? ';' : ',';
       final partes = linea.split(separador);
       if (partes[0].trim().toLowerCase().contains('plot')) continue;
       if (partes.length < 3) throw FormatException('Línea $lineaNum: Faltan columnas');
@@ -313,5 +410,38 @@ class DatabaseHelper {
     }
     if (plots.isEmpty) throw FormatException('El archivo no tiene datos válidos');
     return plots;
+  }
+
+  /// Parser de HISTÓRICOS con columnas flexibles (por encabezado o posicional).
+  /// Es static para poder ejecutarse en segundo plano con compute().
+  static List<Map<String, dynamic>> parsearHistoricos(String contenido) {
+    final lineas = contenido.split(RegExp(r'\r\n|\r|\n'));
+    final header = _buscarEncabezado(lineas);
+    final int inicio = header != null ? header[0] as int : 0;
+    final String separador = header != null ? header[1] as String : (contenido.contains(';') ? ';' : ',');
+    final Map<String, int>? columnas = header != null ? header[2] as Map<String, int> : null;
+    if (columnas != null && (!columnas.containsKey('accession_name') || !columnas.containsKey('plot_number') || !columnas.containsKey('block_number'))) {
+      throw const FormatException('El encabezado debe incluir: plot_name, accession_name, plot_number y block_number');
+    }
+    final historicos = <Map<String, dynamic>>[];
+    for (int i = inicio; i < lineas.length; i++) {
+      final linea = lineas[i].trim().replaceAll('\uFEFF', '');
+      if (linea.isEmpty) continue;
+      final celdas = linea.split(separador).map((c) => c.trim()).toList();
+      String plotName, accessionName, plotNumber, blockStr;
+      if (columnas != null) {
+        String celda(String campo) { final idx = columnas[campo]; return (idx != null && idx < celdas.length) ? celdas[idx] : ''; }
+        plotName = celda('plot_name'); accessionName = celda('accession_name'); plotNumber = celda('plot_number'); blockStr = celda('block_number');
+      } else {
+        if (celdas[0].toLowerCase().contains('plot')) continue; // línea de encabezado suelta
+        if (celdas.length < 4) throw FormatException('Línea ${i + 1}: faltan columnas (se necesitan 4)');
+        plotName = celdas[0]; accessionName = celdas[1]; plotNumber = celdas[2]; blockStr = celdas[3];
+      }
+      if (plotName.isEmpty) continue;
+      final bloque = int.tryParse(blockStr);
+      if (bloque == null) throw FormatException('Línea ${i + 1}: block_number "$blockStr" no es un número');
+      historicos.add({'plot_name': plotName, 'accession_name': accessionName, 'plot_number': plotNumber, 'block_number': bloque});
+    }
+    return historicos;
   }
 }

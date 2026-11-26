@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -50,6 +51,7 @@ class _EscaneoScreenState extends State<EscaneoScreen> {
   // Controladores para el campo de texto del láser
   final _laserController = TextEditingController();
   final _laserFocusNode = FocusNode();
+  Timer? _laserDebounce;
 
   String get _titulo => widget.tipo == 'IPT'
       ? 'Registrar Postcosecha'
@@ -81,6 +83,7 @@ class _EscaneoScreenState extends State<EscaneoScreen> {
 
   @override
   void dispose() {
+    _laserDebounce?.cancel();
     _scannerController.dispose();
     _laserController.dispose();
     _laserFocusNode.dispose();
@@ -90,16 +93,30 @@ class _EscaneoScreenState extends State<EscaneoScreen> {
   // ==========================================
   // INTERFAZ LÁSER / TECLADO (Honeywell)
   // ==========================================
+  // FIX: procesa el escaneo de forma DIRECTA, igual que la cámara.
+  // El campo se limpia al instante y el resultado aparece abajo.
+  // Ya no hay que presionar Enter ni editar el texto.
+  // (Bug anterior: aquí se ponía _procesando = true y luego
+  //  _procesarEscaneo hacía 'return' por su guard, y no procesaba nada.)
   Future<void> _procesarLaserInput(String input) async {
-    if (_procesando || input.trim().isEmpty) return;
-    setState(() => _procesando = true);
-    
-    // Selecciona todo el texto para que el próximo escaneo lo reemplace
-    _laserController.selection = TextSelection(baseOffset: 0, extentOffset: _laserController.text.length);
+    final texto = input.trim();
+    if (texto.isEmpty) return;
+    _laserDebounce?.cancel();
+    _laserController.clear(); // limpia el campo: el resultado se muestra abajo
+    await _procesarEscaneo(texto); // _procesarEscaneo maneja _procesando internamente
+    if (mounted && !_usandoCamara) _laserFocusNode.requestFocus(); // listo para el próximo escaneo
+  }
 
-    await _procesarEscaneo(input.trim());
-    
-    if (mounted) setState(() => _procesando = false);
+  // El láser Honeywell "escribe" el código carácter por carácter en el campo.
+  // Si pasan 350 ms sin que llegue ningún carácter más, el escaneo terminó
+  // y se procesa automáticamente. No requiere Enter ni botón.
+  void _onLaserChanged(String texto) {
+    _laserDebounce?.cancel();
+    if (texto.trim().isEmpty) return;
+    _laserDebounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      _procesarLaserInput(_laserController.text);
+    });
   }
 
   Widget _buildLaserUI() {
@@ -122,7 +139,7 @@ class _EscaneoScreenState extends State<EscaneoScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Apunte con el láser o escriba el código. Se procesa automáticamente al escanear.',
+                'Apunte con el láser o escriba el código.\nSe procesa automáticamente al terminar el escaneo (sin Enter).',
                 style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 textAlign: TextAlign.center,
               ),
@@ -131,6 +148,7 @@ class _EscaneoScreenState extends State<EscaneoScreen> {
                 controller: _laserController,
                 focusNode: _laserFocusNode,
                 autofocus: true,
+                onChanged: _onLaserChanged,
                 onSubmitted: _procesarLaserInput,
                 decoration: InputDecoration(
                   border: const OutlineInputBorder(),
@@ -366,6 +384,9 @@ class _EscaneoScreenState extends State<EscaneoScreen> {
     final bool enviadoSet = r['enviado_set'] as bool;
     final bool enviadoCpt = r['enviado_cpt'] as bool;
     final bool tieneCpt = r['tiene_cpt'] as bool;
+    // NUEVO: historial de envíos de este genotipo (todas las fechas)
+    final List<Map<String, dynamic>> historial =
+        ((r['historial'] as List?) ?? const []).cast<Map<String, dynamic>>();
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -380,6 +401,8 @@ class _EscaneoScreenState extends State<EscaneoScreen> {
           const SizedBox(height: 8),
           Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.teal.withOpacity(0.08), borderRadius: BorderRadius.circular(8)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('SET (Blq ${r['bloque_set']})', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal, fontSize: 12)), const SizedBox(height: 4), if (listaSet.isEmpty) const Text('Sin plot en este bloque', style: TextStyle(fontSize: 12, color: Colors.grey)) else Row(children: [Text('Plot: $listaSet', style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 13)), const SizedBox(width: 8), Icon(enviadoSet ? Icons.check_circle : Icons.cancel, color: enviadoSet ? Colors.green : Colors.red, size: 18), const SizedBox(width: 4), Text(enviadoSet ? 'Enviado' : 'No enviado', style: TextStyle(color: enviadoSet ? Colors.green : Colors.red, fontWeight: FontWeight.bold, fontSize: 12))])])),
           if (tieneCpt) ...[const SizedBox(height: 8), Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.deepPurple.withOpacity(0.08), borderRadius: BorderRadius.circular(8)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('CPT (Blq ${r['bloque_cpt']})', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple, fontSize: 12)), const SizedBox(height: 4), if (listaCpt.isEmpty) const Text('Sin plot en este bloque', style: TextStyle(fontSize: 12, color: Colors.grey)) else Row(children: [Text('Plot: $listaCpt', style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 13)), const SizedBox(width: 8), Icon(enviadoCpt ? Icons.check_circle : Icons.cancel, color: enviadoCpt ? Colors.green : Colors.red, size: 18), const SizedBox(width: 4), Text(enviadoCpt ? 'Enviado' : 'No enviado', style: TextStyle(color: enviadoCpt ? Colors.green : Colors.red, fontWeight: FontWeight.bold, fontSize: 12))])]))],
+          // HISTORIAL DE ENVÍOS DE ESTE GENOTIPO (todas las fechas, todos los bloques)
+          if (historial.isNotEmpty) ...[const SizedBox(height: 8), Container(width: double.infinity, padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.brown.withOpacity(0.08), borderRadius: BorderRadius.circular(8)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('HISTORIAL DE ENVÍOS (GENOTIPO)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.brown, fontSize: 11)), const SizedBox(height: 4), for (var h in historial) Padding(padding: const EdgeInsets.only(top: 2), child: Text('${h['experiment_type']} — Bloque ${h['block_number']}: ${h['veces']} envío${h['veces'] == 1 ? '' : 's'}', style: const TextStyle(fontSize: 12, fontFamily: 'monospace')))]))],
         ],
       ),
     );

@@ -58,9 +58,12 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_sincronizando) return;
     setState(() => _sincronizando = true);
     try {
-      await _sync.sincronizarTodo(proyectoActual: _proyectoSeleccionado);
+      // NUEVO: descargarDatos = true -> también BAJA plots y envíos de la nube
+      // (sirve para recuperar todo al instalar la app en un celular nuevo
+      //  o después de "Formatear Todo")
+      await _sync.sincronizarTodo(proyectoActual: _proyectoSeleccionado, descargarDatos: true);
       await _cargarDatos();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✓ Sincronizado con la nube'), backgroundColor: Colors.green));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✓ Sincronizado: datos subidos y descargados de la nube'), backgroundColor: Colors.green));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Sin conexión a la nube. La app seguirá funcionando local.\nDetalle: ${e.toString().replaceFirst('Exception: ', '')}'), backgroundColor: Colors.orange, duration: const Duration(seconds: 4)));
     } finally { if (mounted) setState(() => _sincronizando = false); }
@@ -119,7 +122,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Text('Herramientas y Datos', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey[600])), const SizedBox(height: 12),
         _accionSecundaria(Icons.upload_file, 'Cargar Libros de Campo', 'CSV de Campo, Postcosecha, Sensorial o CPT', _irACargar),
         _accionSecundaria(Icons.history, 'Cargar Históricos', 'CSV de plots ya enviados', _irAHistoricos, hab: _proyectoSeleccionado != null),
-        Container(margin: const EdgeInsets.only(bottom: 12, top: 4), decoration: BoxDecoration(color: _sincronizando ? Colors.blue.withOpacity(0.1) : Colors.blue.shade50, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.blue.shade200)), child: ListTile(leading: _sincronizando ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.blue)) : const Icon(Icons.cloud_upload_outlined, color: Colors.blue), title: Text('Sincronizar Nube', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue.shade700)), subtitle: Text(_sincronizando ? 'Sincronizando...' : 'Actualizar datos con otros usuarios', style: TextStyle(fontSize: 12, color: Colors.blue.shade400)), trailing: const Icon(Icons.chevron_right, color: Colors.blue), onTap: !_sincronizando ? _sincronizar : null)),
+        Container(margin: const EdgeInsets.only(bottom: 12, top: 4), decoration: BoxDecoration(color: _sincronizando ? Colors.blue.withOpacity(0.1) : Colors.blue.shade50, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.blue.shade200)), child: ListTile(leading: _sincronizando ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.blue)) : const Icon(Icons.cloud_upload_outlined, color: Colors.blue), title: Text('Sincronizar Nube', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue.shade700)), subtitle: Text(_sincronizando ? 'Sincronizando...' : 'Sube locales y descarga plots/envíos de la nube', style: TextStyle(fontSize: 12, color: Colors.blue.shade400)), trailing: const Icon(Icons.chevron_right, color: Colors.blue), onTap: !_sincronizando ? _sincronizar : null)),
         const SizedBox(height: 24),
         Text('Gestión de Bloques', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey[600])), const SizedBox(height: 12),
         _botonesBloque('IPT', Colors.purple), const SizedBox(height: 8), _botonesBloque('SET', Colors.teal),

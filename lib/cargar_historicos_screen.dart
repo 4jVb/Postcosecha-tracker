@@ -28,7 +28,8 @@ class _CargarHistoricosScreenState extends State<CargarHistoricosScreen> {
       if (archivo == null) return;
       final contenido = await archivo.readAsString();
       // FIX RENDIMIENTO: Procesar en segundo plano
-      final historicos = await compute(_parsearHistoricosEnSegundoPlano, contenido);
+      // NUEVO: usa el parser flexible de DatabaseHelper (detecta columnas por encabezado)
+      final historicos = await compute(DatabaseHelper.parsearHistoricos, contenido);
       if (historicos.isEmpty) throw FormatException('No hay datos válidos');
       if (mounted) setState(() { _rutaArchivo = archivo.path; _cantidadParseada = historicos.length; });
       setState(() => _cargando = true);
@@ -39,32 +40,27 @@ class _CargarHistoricosScreenState extends State<CargarHistoricosScreen> {
     }
   }
 
-  // Función estática para segundo plano
-  static List<Map<String, dynamic>> _parsearHistoricosEnSegundoPlano(String contenido) {
-    final lineas = contenido.split(RegExp(r'\r\n|\r|\n'));
-    final historicos = <Map<String, dynamic>>[];
-    for (var linea in lineas) {
-      linea = linea.trim().replaceAll('\uFEFF', '');
-      if (linea.isEmpty) continue;
-      final separador = linea.contains(';') ? ';' : ',';
-      final partes = linea.split(separador);
-      if (partes[0].trim().toLowerCase().contains('plot')) continue;
-      if (partes.length < 4) throw FormatException('Faltan columnas (se necesitan 4)');
-      historicos.add({
-        'plot_name': partes[0].trim(),
-        'accession_name': partes[1].trim(),
-        'plot_number': partes[2].trim(),
-        'block_number': int.parse(partes[3].trim()),
-      });
-    }
-    return historicos;
-  }
+  // El parseo ahora vive en DatabaseHelper.parsearHistoricos (columnas flexibles)
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Cargar Históricos')),
       body: SingleChildScrollView(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Card(color: Colors.blue.shade50, child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [Icon(Icons.table_chart, color: Colors.blue.shade700), const SizedBox(width: 8), Text('Columnas esperadas (en cualquier orden)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue.shade700))]),
+          const SizedBox(height: 8),
+          const Text(
+            'El CSV debe tener estas 4 columnas. Si el archivo tiene encabezado (fila de títulos), el orden no importa:\n\n'
+            '• plot_name — nombre del plot (ej: PROY-IPT_12)\n'
+            '• accession_name — accesión / genotipo (ej: GEN-01)\n'
+            '• plot_number — número de plot (ej: 12)\n'
+            '• block_number — número de bloque (ej: 1)\n\n'
+            'Si NO tiene encabezado, el orden debe ser exactamente:\nplot_name, accession_name, plot_number, block_number',
+            style: TextStyle(fontSize: 13),
+          )
+        ]))),
+        const SizedBox(height: 16),
         Card(color: Colors.amber.shade50, child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [Icon(Icons.info, color: Colors.amber.shade800), const SizedBox(width: 8), Text('Auto-avance de bloques', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amber.shade800))]),
           const SizedBox(height: 8),
