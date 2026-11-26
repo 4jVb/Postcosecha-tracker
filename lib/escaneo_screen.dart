@@ -139,7 +139,7 @@ class _EscaneoScreenState extends State<EscaneoScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Apunte con el láser o escriba el código.\nSe procesa automáticamente al terminar el escaneo (sin Enter).',
+                'Apunte con el láser del equipo.',
                 style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 textAlign: TextAlign.center,
               ),
@@ -332,7 +332,7 @@ class _EscaneoScreenState extends State<EscaneoScreen> {
 
   void _mostrarIngresoManualCPT() {
     final controller = TextEditingController();
-    showDialog(context: context, builder: (ctx) => AlertDialog(title: const Text('Registrar Panel Consumidor (CPT)'), content: TextField(controller: controller, autofocus: true, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: 'Plot Number (ej: 1)', border: OutlineInputBorder(), isDense: true), onSubmitted: (v) { Navigator.pop(ctx); if (v.trim().isNotEmpty) _procesarManualCPT(v.trim()); }), actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')), FilledButton(onPressed: () { Navigator.pop(ctx); if (controller.text.trim().isNotEmpty) _procesarManualCPT(controller.text.trim()); }, child: const Text('Aceptar'))]));
+    showDialog(context: context, builder: (ctx) => AlertDialog(title: const Text('Registrar Panel Consumidor (CPT)'), content: TextField(controller: controller, autofocus: true, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: 'plot_number (ej: 1)', border: OutlineInputBorder(), isDense: true), onSubmitted: (v) { Navigator.pop(ctx); if (v.trim().isNotEmpty) _procesarManualCPT(v.trim()); }), actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')), FilledButton(onPressed: () { Navigator.pop(ctx); if (controller.text.trim().isNotEmpty) _procesarManualCPT(controller.text.trim()); }, child: const Text('Aceptar'))]));
   }
 
   Widget _buildCptUI() {
@@ -573,7 +573,7 @@ class _EscaneoScreenState extends State<EscaneoScreen> {
   // ==========================================
   void _mostrarIngresoManual() {
     final controller = TextEditingController();
-    showDialog(context: context, builder: (ctx) => AlertDialog(title: const Text('Consultar Planta'), content: Column(mainAxisSize: MainAxisSize.min, children: [const Text('Números -> Plot Number\nLetras -> Accesion Name', style: TextStyle(fontSize: 13)), const SizedBox(height: 8), TextField(controller: controller, autofocus: true, decoration: const InputDecoration(hintText: 'Ej: 1 ó GEN-01', border: OutlineInputBorder(), isDense: true), onSubmitted: (v) { Navigator.pop(ctx); if (v.trim().isNotEmpty) _procesarManual(v.trim()); })]), actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')), FilledButton(onPressed: () { Navigator.pop(ctx); if (controller.text.trim().isNotEmpty) _procesarManual(controller.text.trim()); }, child: const Text('Aceptar'))]));
+    showDialog(context: context, builder: (ctx) => AlertDialog(title: const Text('Consultar Planta'), content: Column(mainAxisSize: MainAxisSize.min, children: [const Text('Números -> plot_number\nLetras -> accesion_name', style: TextStyle(fontSize: 13)), const SizedBox(height: 8), TextField(controller: controller, autofocus: true, decoration: const InputDecoration(hintText: 'Ej: 1 o Csol18.148.118', border: OutlineInputBorder(), isDense: true), onSubmitted: (v) { Navigator.pop(ctx); if (v.trim().isNotEmpty) _procesarManual(v.trim()); })]), actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')), FilledButton(onPressed: () { Navigator.pop(ctx); if (controller.text.trim().isNotEmpty) _procesarManual(controller.text.trim()); }, child: const Text('Aceptar'))]));
   }
 
   Future<void> _procesarManual(String input) async {

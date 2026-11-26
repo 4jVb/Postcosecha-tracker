@@ -76,8 +76,8 @@ class _HomeScreenState extends State<HomeScreen> {
     int bloqueNuevo;
     if (tipo == 'IPT') bloqueNuevo = _bloqueIpt + delta; else if (tipo == 'SET') bloqueNuevo = _bloqueSet + delta; else bloqueNuevo = _bloqueCpt + delta;
     final confirmar = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
-      title: Text('$accion Bloque $nombreTipo'),
-      content: Text(delta > 0 ? '¿Pasar al bloque $bloqueNuevo?\nSe reiniciará la lista de enviados.' : '¿Retroceder al bloque $bloqueNuevo?'),
+      title: Text('$accion Momento $nombreTipo'),
+      content: Text(delta > 0 ? '¿Pasar al momento $bloqueNuevo?\nSe reiniciará la lista de enviados.' : '¿Retroceder al momento $bloqueNuevo?'),
       actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')), FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Confirmar'))],
     ));
     if (confirmar == true) {
@@ -91,7 +91,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _formatTotal() {
     showDialog(context: context, builder: (ctx) => AlertDialog(
       title: const Text('⚠️ FORMATEAR TODO', style: TextStyle(color: Colors.red)),
-      content: const Text('Se eliminarán TODOS los proyectos, libros de campo, envíos y bloques.'),
+      content: const Text('Se eliminarán TODOS los proyectos, libros de campo, envíos y momentos.'),
       actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')), FilledButton(style: FilledButton.styleFrom(backgroundColor: Colors.red), onPressed: () async { await _db.limpiarTodo(); if (mounted) { Navigator.pop(ctx); setState(() { _proyectos = []; _proyectoSeleccionado = null; _plotsCargados = 0; _enviosHoy = 0; _tieneCPT = false; }); } }, child: const Text('Borrar Todo'))],
     ));
   }
@@ -108,14 +108,14 @@ class _HomeScreenState extends State<HomeScreen> {
           Text('Estado Actual', style: Theme.of(context).textTheme.titleLarge), const SizedBox(height: 16),
           Row(children: [Expanded(child: _statCard(Icons.inventory_2, 'Plots', '$_plotsCargados', Colors.indigo)), const SizedBox(width: 12), Expanded(child: _statCard(Icons.check_circle_outline, 'Envíos Hoy', '$_enviosHoy', Colors.green))]),
           const Divider(height: 32),
-          _filaStatModerna(Icons.agriculture, 'Postcosecha (IPT)', 'Bloque $_bloqueIpt', Colors.purple), const SizedBox(height: 12),
-          _filaStatModerna(Icons.rate_review, 'Sensorial (SET)', 'Bloque $_bloqueSet', Colors.teal),
-          if (_tieneCPT) ...[const SizedBox(height: 12), _filaStatModerna(Icons.groups, 'Panel Consumidor (CPT)', 'Bloque $_bloqueCpt', Colors.deepPurple)],
+          _filaStatModerna(Icons.agriculture, 'Postcosecha (IPT)', 'Momento $_bloqueIpt', Colors.purple), const SizedBox(height: 12),
+          _filaStatModerna(Icons.rate_review, 'Sensorial (SET)', 'Momento $_bloqueSet', Colors.teal),
+          if (_tieneCPT) ...[const SizedBox(height: 12), _filaStatModerna(Icons.groups, 'Panel Consumidor (CPT)', 'Momento $_bloqueCpt', Colors.deepPurple)],
         ]))),
         const SizedBox(height: 32),
         _accionPrincipal(Icons.qr_code_scanner, 'Registrar Postcosecha (IPT)', 'Escaneo por QR', Colors.purple, _irAIPT, hab: _proyectoSeleccionado != null), const SizedBox(height: 12),
-        _accionPrincipal(Icons.checklist, 'Registrar Sensorial (SET)', 'Selección por bloque', Colors.teal, _irASET, hab: _proyectoSeleccionado != null),
-        if (_tieneCPT) ...[const SizedBox(height: 12), _accionPrincipal(Icons.groups, 'Registrar Panel Consumidor (CPT)', 'Selección por bloque', Colors.deepPurple, _irACPT, hab: _proyectoSeleccionado != null)],
+        _accionPrincipal(Icons.checklist, 'Registrar Sensorial (SET)', 'Selección por Momento', Colors.teal, _irASET, hab: _proyectoSeleccionado != null),
+        if (_tieneCPT) ...[const SizedBox(height: 12), _accionPrincipal(Icons.groups, 'Registrar Panel Consumidor (CPT)', 'Selección por momento', Colors.deepPurple, _irACPT, hab: _proyectoSeleccionado != null)],
         const SizedBox(height: 12),
         _accionPrincipal(Icons.search, 'Consultar Campo (INT)', 'Consulta rápida de accesiones', Colors.brown, _irAINT, hab: _proyectoSeleccionado != null),
         const SizedBox(height: 32),
@@ -124,7 +124,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _accionSecundaria(Icons.history, 'Cargar Históricos', 'CSV de plots ya enviados', _irAHistoricos, hab: _proyectoSeleccionado != null),
         Container(margin: const EdgeInsets.only(bottom: 12, top: 4), decoration: BoxDecoration(color: _sincronizando ? Colors.blue.withOpacity(0.1) : Colors.blue.shade50, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.blue.shade200)), child: ListTile(leading: _sincronizando ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.blue)) : const Icon(Icons.cloud_upload_outlined, color: Colors.blue), title: Text('Sincronizar Nube', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue.shade700)), subtitle: Text(_sincronizando ? 'Sincronizando...' : 'Sube locales y descarga plots/envíos de la nube', style: TextStyle(fontSize: 12, color: Colors.blue.shade400)), trailing: const Icon(Icons.chevron_right, color: Colors.blue), onTap: !_sincronizando ? _sincronizar : null)),
         const SizedBox(height: 24),
-        Text('Gestión de Bloques', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey[600])), const SizedBox(height: 12),
+        Text('Gestión de Momentos', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey[600])), const SizedBox(height: 12),
         _botonesBloque('IPT', Colors.purple), const SizedBox(height: 8), _botonesBloque('SET', Colors.teal),
         if (_tieneCPT) ...[const SizedBox(height: 8), _botonesBloque('CPT', Colors.deepPurple)],
         const SizedBox(height: 32),

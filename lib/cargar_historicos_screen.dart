@@ -51,20 +51,20 @@ class _CargarHistoricosScreenState extends State<CargarHistoricosScreen> {
           Row(children: [Icon(Icons.table_chart, color: Colors.blue.shade700), const SizedBox(width: 8), Text('Columnas esperadas (en cualquier orden)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue.shade700))]),
           const SizedBox(height: 8),
           const Text(
-            'El CSV debe tener estas 4 columnas. Si el archivo tiene encabezado (fila de títulos), el orden no importa:\n\n'
-            '• plot_name — nombre del plot (ej: PROY-IPT_12)\n'
-            '• accession_name — accesión / genotipo (ej: GEN-01)\n'
-            '• plot_number — número de plot (ej: 12)\n'
-            '• block_number — número de bloque (ej: 1)\n\n'
+            'El CSV debe tener estas 4 columnas. Si el archivo tiene encabezado, el orden no importa:\n\n'
+            '• plot_name\n'
+            '• accession_name\n'
+            '• plot_number\n'
+            '• block_number\n\n'
             'Si NO tiene encabezado, el orden debe ser exactamente:\nplot_name, accession_name, plot_number, block_number',
             style: TextStyle(fontSize: 13),
           )
         ]))),
         const SizedBox(height: 16),
         Card(color: Colors.amber.shade50, child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [Icon(Icons.info, color: Colors.amber.shade800), const SizedBox(width: 8), Text('Auto-avance de bloques', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amber.shade800))]),
+          Row(children: [Icon(Icons.info, color: Colors.amber.shade800), const SizedBox(width: 8), Text('Auto-avance de momentos', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amber.shade800))]),
           const SizedBox(height: 8),
-          const Text('Al cargar este CSV, la app buscará el bloque más alto y actualizará automáticamente el contador. También se sincronizará con Firebase.', style: TextStyle(fontSize: 13))
+          const Text('Al cargar este CSV, la app buscará el último momento y actualizará automáticamente el contador.', style: TextStyle(fontSize: 13))
         ]))),
         const SizedBox(height: 16),
         FilledButton.icon(onPressed: _cargando ? null : _seleccionarYProcesar, icon: _cargando ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.upload), label: const Text('Seleccionar y Procesar CSV'), style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16))),
